@@ -1,6 +1,7 @@
 // کارت فوکوس: گالری، قیمت، فوریت موجودی، انتخاب Variation، افزودن به سبد، علاقه‌مندی، اشتراک، محصولات مشابه
 import { h, icon } from '../utils/dom.js';
 import { formatPrice, formatNumber, formatPercent, tpl } from '../utils/format.js';
+import { inertOthers } from '../utils/inert.js';
 import { Gallery } from './Gallery.js';
 import { heartButton } from './Wishlist.js';
 import { RelatedProducts } from './RelatedProducts.js';
@@ -12,8 +13,12 @@ export class Card {
     this.app = app;
     this.current = null;
     this.release = null;
+    this.releaseInert = null;
     this.parts = [];
-    this.el = h('aside', { class: `sf3d-card sf3d-card--${app.config.cardPosition}`, 'aria-hidden': 'true' });
+    this.gallery = null;
+    this.form = null;
+    this.titleId = `${app.uid}-card-title`;
+    this.el = h('aside', { class: `sf3d-card sf3d-card--${app.config.cardPosition}`, 'aria-hidden': 'true', inert: true });
     app.stage.appendChild(this.el);
     this.unsub = app.store.subscribe('activeProduct', (id) => this.render(id));
   }
@@ -21,10 +26,29 @@ export class Card {
   clearParts() {
     this.parts.forEach((p) => p.destroy && p.destroy());
     this.parts = [];
+    this.gallery = null;
+    this.form = null;
+    // ترتیب مهم است: اول inert برداشته شود، بعد فوکوس به عنصر قبلی برگردد
+    // (فوکوس روی عنصر inert بی‌صدا شکست می‌خورد)
+    if (this.releaseInert) {
+      this.releaseInert();
+      this.releaseInert = null;
+    }
     if (this.release) {
       this.release();
       this.release = null;
     }
+  }
+
+  /** حالت بسته: هیچ نشانه‌ی modal باقی نمی‌ماند و کارت از درخت دسترس‌پذیری خارج می‌شود */
+  close() {
+    const el = this.el;
+    this.current = null;
+    el.classList.remove('is-open');
+    el.removeAttribute('aria-modal');
+    el.removeAttribute('aria-labelledby');
+    el.setAttribute('aria-hidden', 'true');
+    el.setAttribute('inert', '');
   }
 
   render(id) {
@@ -36,22 +60,24 @@ export class Card {
       t && t.setImage(prev.image);
     }
     if (id === null) {
-      this.current = null;
-      this.el.classList.remove('is-open');
-      this.el.setAttribute('aria-hidden', 'true');
-      this.el.inert = true;
+      this.close();
       return;
     }
     const p = app.getProduct(id);
-    if (!p) return;
+    if (!p) {
+      // محصول پیدا نشد: کارت نیمه‌باز با محتوای قدیمی نماند
+      this.close();
+      return;
+    }
     this.current = p;
     const c = app.config;
     const s = c.strings;
     this.el.textContent = '';
-    this.el.inert = false;
-    this.el.setAttribute('aria-hidden', 'false');
+    this.el.removeAttribute('inert');
+    this.el.removeAttribute('aria-hidden');
     this.el.setAttribute('role', 'dialog');
-    this.el.setAttribute('aria-label', p.title);
+    this.el.setAttribute('aria-labelledby', this.titleId);
+    this.el.removeAttribute('aria-label');
 
     const closeBtn = h('button', { type: 'button', class: 'sf3d-card__close', 'aria-label': s.close }, icon('close', 20));
     closeBtn.addEventListener('click', () => app.closeProduct());
@@ -62,7 +88,7 @@ export class Card {
     if (p.on_sale && p.discount) badges.appendChild(h('span', { class: 'sf3d-pill sf3d-pill--sale' }, `${s.sale} ${formatPercent(p.discount, c.locale)}`));
     if (p.is_new) badges.appendChild(h('span', { class: 'sf3d-pill sf3d-pill--new' }, s.new));
 
-    const title = h('h2', { class: 'sf3d-card__title' }, p.title);
+    const title = h('h2', { class: 'sf3d-card__title', id: this.titleId }, p.title);
     this.priceEl = h('div', { class: 'sf3d-card__price' });
     this.stockEl = h('div', { class: 'sf3d-stock', role: 'status' });
     this.addBtn = h('button', { type: 'button', class: 'sf3d-btn sf3d-btn--primary sf3d-card__add' });
@@ -123,7 +149,20 @@ export class Card {
     this.addBtn.onclick = () => this.add();
     this.refresh();
     this.el.classList.add('is-open');
+
+    // ۱) اول trap: عنصر فوکوس‌شده‌ی فعلی را برای بازگردانی ذخیره می‌کند
     this.release = app.focusManager.trap(this.el, { onEscape: () => app.closeProduct(), initial: closeBtn });
+
+    // ۲) بعد inert: اگر عنصر فوکوس‌شده داخل بخش inert باشد مرورگر فوکوس را رها می‌کند
+    // aria-modal فقط وقتی گذاشته می‌شود که بقیه‌ی صحنه واقعاً غیرفعال شده باشد
+    // (کانواس برای درگ/کلیک روی کفش‌ها و live regionها عمداً فعال می‌مانند)
+    // برای پنل غیرمودال: config.cardModal = false
+    if (c.cardModal !== false) {
+      this.el.setAttribute('aria-modal', 'true');
+      this.releaseInert = inertOthers(app.stage, this.el);
+    } else {
+      this.el.removeAttribute('aria-modal');
+    }
   }
 
   /** بروزرسانی قیمت، موجودی و دکمه بر اساس وضعیت فعلی */
@@ -207,8 +246,10 @@ export class Card {
     }
   }
 
+  // ⚠️ بخش انتهایی فایل اصلی (destroy) در خروجی ابزار من قطع شده بود و آن را ندیدم.
+  // این نسخه بازسازی شده است؛ قبل از جایگزینی با destroy() فعلی خودتان مقایسه کنید.
   destroy() {
-    this.unsub();
+    this.unsub && this.unsub();
     this.clearParts();
     this.el.remove();
   }

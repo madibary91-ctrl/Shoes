@@ -1,0 +1,15 @@
+# SF3D Shoe Finder — قالب ترجمه (منبع: فارسی)
+msgid ""
+msgstr ""
+"Project-Id-Version: SF3D Shoe Finder 2.0.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"X-Domain: sf3d-shoe-finder\n"
+
+msgid "همه"
+msgstr ""
+
+msgid "افزودن به سبد"
+msgstr ""
+
+msgid "ناموجود"
+msgstr ""

@@ -1,0 +1,25 @@
+{
+  "name": "sf3d-shoe-finder",
+  "version": "2.0.0",
+  "private": true,
+  "description": "SF3D Shoe Finder - 3D product grid for WooCommerce / Elementor",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --mode development --watch",
+    "build": "vite build --mode development && vite build --mode production",
+    "test": "vitest run",
+    "lint": "eslint assets/src tests/js",
+    "format": "prettier --write \"assets/src/**/*.js\"",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.3.0",
+    "terser": "^5.31.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

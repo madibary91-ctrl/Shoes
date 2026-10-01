@@ -1,0 +1,31 @@
+{
+  "name": "sf3d/shoe-finder",
+  "description": "SF3D Shoe Finder - 3D WooCommerce product grid with Elementor widget and Gutenberg block",
+  "type": "wordpress-plugin",
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "php": ">=7.4"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6",
+    "phpstan/phpstan": "^1.10"
+  },
+  "autoload": {
+    "psr-4": {
+      "SF3D\\Plugin\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "SF3D\\Plugin\\Tests\\": "tests/php/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "analyse": "phpstan analyse -c phpstan.neon"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "platform": { "php": "7.4.33" }
+  }
+}

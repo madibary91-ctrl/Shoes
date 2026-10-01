@@ -1,0 +1,10 @@
+parameters:
+  level: 6
+  paths:
+    - src
+  excludePaths:
+    - src/Legacy
+  ignoreErrors:
+    # کلاس‌های المنتور فقط در حضور المنتور وجود دارند
+    - '#Elementor\\#'
+    - '#WC_AJAX#'

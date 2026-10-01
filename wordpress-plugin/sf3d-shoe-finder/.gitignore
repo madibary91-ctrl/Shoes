@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts
+# توجه: assets/dist/ عمداً ignore نشده، چون workflow آن را commit می‌کند.
+*.zip
+/build/
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+.phpunit.result.cache
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { parseHash, buildHash, writeHash, HASH_LIMITS } from '../../assets/src/utils/hash.js';
 
@@ -152,7 +153,6 @@ describe('parseHash: سقف‌ها', () => {
   });
 
   it('MAX_FILTER_PAIRS: مجموع جفت‌ها دقیقاً به سقف می‌رسد', () => {
-    // ۳ کلید × ۲۰ مقدار = ۶۰ جفت (و hash هنوز کوتاه‌تر از MAX_HASH_LENGTH است)
     const f = ['a', 'b', 'c'].flatMap((k) => Array.from({ length: 20 }, (_, v) => `${k}:${v}`)).join(',');
     expect('#filter=' + enc(f)).toHaveLength(Math.min('#filter='.length + enc(f).length, 1999));
     const out = parseHash('#filter=' + enc(f));
@@ -293,7 +293,7 @@ describe('writeHash: فقط replaceState', () => {
   });
 
   it('در سورس هیچ pushState یا انتساب location.hash/assign/replace وجود ندارد', () => {
-    const src = readFileSync(new URL('../../assets/src/utils/hash.js', import.meta.url), 'utf8');
+    const src = readFileSync(resolve(process.cwd(), 'assets/src/utils/hash.js'), 'utf8');
     expect(src).not.toMatch(/pushState\s*\(/);
     expect(src).not.toMatch(/location\.hash\s*=(?!=)/);
     expect(src).not.toMatch(/location\.(assign|replace)\s*\(/);

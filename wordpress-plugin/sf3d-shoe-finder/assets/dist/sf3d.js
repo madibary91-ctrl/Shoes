@@ -174,6 +174,34 @@
     bgScale: 3,
     bgLineThickness: 0.03
   };
+  const GRID_LIMITS = {
+    gridCols: [1, 24, true],
+    itemSize: [0.5, 10],
+    gap: [0, 5],
+    dragSpeed: [0.1, 10],
+    dampFactor: [0.01, 1],
+    clickThreshold: [1, 50],
+    dragResistance: [0, 1],
+    zoomIn: [2, 80],
+    zoomOut: [5, 160],
+    zoomDamp: [0.01, 1],
+    fov: [10, 100],
+    focusScale: [1, 4],
+    dimScale: [0.1, 1],
+    dimOpacity: [0, 1],
+    curvatureStrength: [0, 1],
+    cullDistance: [1, 200],
+    mapWidth: [10, 1e3],
+    fogNear: [0, 500],
+    fogFar: [1, 1e3],
+    enterStaggerDelay: [0, 3e3],
+    exitStaggerDelay: [0, 3e3],
+    cleanupTimeout: [0, 5e3],
+    bgOpacity: [0, 1],
+    bgSpeed: [0, 5],
+    bgScale: [0.1, 20],
+    bgLineThickness: [0, 1]
+  };
   const FEATURE_DEFAULTS = {
     wishlist: true,
     quickActions: true,
@@ -193,6 +221,7 @@
   };
   const DEFAULT_PRESET = "minimal";
   const PRESET_RE = /^[a-z0-9_-]{1,32}$/;
+  const HEX_RE = /^#[0-9a-f]{3,8}$/i;
   const STRINGS = {
     all: "همه",
     wishlist: "علاقه‌مندی‌ها",
@@ -250,9 +279,29 @@
     wishlistAdded: "{title} به علاقه‌مندی‌ها اضافه شد",
     wishlistRemoved: "{title} از علاقه‌مندی‌ها حذف شد",
     focused: "{title} انتخاب شد",
-    products: "محصول"
+    products: "محصول",
+    // ── [F14] کلیدهای جدید ──
+    gallery: "گالری تصاویر",
+    // ── کلیدهای مورد نیاز fixهای بعدی (F5, F7, F9, F10, F17) ──
+    networkError: "اتصال برقرار نشد. اینترنت خود را بررسی کنید و دوباره تلاش کنید.",
+    resultsCount: "{n} محصول یافت شد",
+    cartCount: "سبد خرید، {n} کالا",
+    compareOn: "{title} به مقایسه اضافه شد",
+    compareOff: "{title} از مقایسه حذف شد",
+    selectOn: "{title} برای افزودن گروهی انتخاب شد",
+    selectOff: "{title} از انتخاب گروهی خارج شد",
+    webglLost: "نمایش سه‌بعدی قطع شد؛ در حال بازیابی…",
+    webglRestored: "نمایش سه‌بعدی دوباره برقرار شد"
   };
   const num = (v, d) => Number.isFinite(Number(v)) && v !== "" && v !== null ? Number(v) : d;
+  function clampGrid(key, value) {
+    const lim = GRID_LIMITS[key];
+    if (!lim) return value;
+    const [min, max, int] = lim;
+    let v = Math.min(max, Math.max(min, value));
+    if (int) v = Math.round(v);
+    return v;
+  }
   const normalizePreset = (v) => {
     const s = typeof v === "string" ? v.trim().toLowerCase() : "";
     return PRESET_RE.test(s) ? s : DEFAULT_PRESET;
@@ -262,8 +311,16 @@
     Object.keys(GRID_DEFAULTS).forEach((k) => {
       const v = raw.grid && raw.grid[k];
       if (v === void 0 || v === null || v === "") return;
-      grid[k] = typeof GRID_DEFAULTS[k] === "number" ? num(v, GRID_DEFAULTS[k]) : String(v);
+      if (typeof GRID_DEFAULTS[k] === "number") {
+        grid[k] = clampGrid(k, num(v, GRID_DEFAULTS[k]));
+      } else if (k === "bgColor") {
+        grid[k] = HEX_RE.test(String(v)) ? String(v) : GRID_DEFAULTS[k];
+      } else {
+        grid[k] = String(v);
+      }
     });
+    if (grid.zoomOut <= grid.zoomIn) grid.zoomOut = grid.zoomIn + 1;
+    if (grid.fogFar <= grid.fogNear) grid.fogFar = grid.fogNear + 1;
     const features = { ...FEATURE_DEFAULTS };
     Object.keys(FEATURE_DEFAULTS).forEach((k) => {
       if (raw.features && k in raw.features) features[k] = !!raw.features[k] && raw.features[k] !== "0";
@@ -285,6 +342,7 @@
       title: raw.title || "",
       height: raw.height || "",
       theme: raw.theme || "auto",
+      // [F2b] preset حالا از PHP (Renderer::config) می‌رسد
       preset: normalizePreset(raw.preset),
       startCollection: raw.startCollection || "all",
       cardPosition: raw.cardPosition || "end",

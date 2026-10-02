@@ -3,7 +3,10 @@ import { h, icon } from '../utils/dom.js';
 
 export class Toast {
   constructor(root) {
-    this.box = h('div', { class: 'sf3d-toasts', 'aria-hidden': 'true' });
+    // [F1] data-sf3d-keep: وقتی کارت مودال باز است inertOthers() بقیه‌ی فرزندان stage را inert می‌کند.
+    // بدون این صفت، دکمه‌ی اکشن توست (مثلاً «سبد») غیرقابل کلیک می‌شد.
+    // h() مقدار '' را به‌صورت data-sf3d-keep="" روی عنصر می‌گذارد (بررسی‌شده در utils/dom.js)
+    this.box = h('div', { class: 'sf3d-toasts', 'aria-hidden': 'true', 'data-sf3d-keep': '' });
     root.appendChild(this.box);
   }
 

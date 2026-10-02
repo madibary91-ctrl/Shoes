@@ -2861,7 +2861,7 @@ void main() {
   }
   class Toast {
     constructor(root) {
-      this.box = h("div", { class: "sf3d-toasts", "aria-hidden": "true" });
+      this.box = h("div", { class: "sf3d-toasts", "aria-hidden": "true", "data-sf3d-keep": "" });
       root.appendChild(this.box);
     }
     /**

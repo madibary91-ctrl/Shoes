@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
   const prod = mode === 'production';
   return {
     publicDir: false,
+    // جلوگیری از پیدا شدن postcss.config.mjs ریشه‌ی ریپو (مال Next.js)
+    css: { postcss: {} },
     build: {
       outDir: 'assets/dist',
       emptyOutDir: false,

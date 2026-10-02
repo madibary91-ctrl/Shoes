@@ -823,6 +823,43 @@ void main() {
   function tpl(str, vars = {}) {
     return String(str).replace(/\{(\w+)\}/g, (m, k) => k in vars ? vars[k] : m);
   }
+  const DEFAULT_COLORS = {
+    sale: "#e11d48",
+    // حراج / شمارنده
+    new: "#16a34a",
+    // جدید
+    dot: "#38bdf8",
+    // نقطه‌ی فعال
+    oos: "#6b7280",
+    // ناموجود
+    gridDark: "#52525b",
+    // خطوط پس‌زمینه در تم تاریک
+    selected: "#2563eb"
+    // انتخاب گروهی
+  };
+  const COLOR_VARS = {
+    sale: "--sf3d-sale",
+    new: "--sf3d-new",
+    dot: "--sf3d-dot",
+    oos: "--sf3d-oos",
+    gridDark: "--sf3d-grid-dark",
+    selected: "--sf3d-selected"
+  };
+  function resolveColors(el, overrides) {
+    let cs = null;
+    try {
+      cs = el && typeof getComputedStyle === "function" ? getComputedStyle(el) : null;
+    } catch (e) {
+      cs = null;
+    }
+    const out = {};
+    Object.keys(DEFAULT_COLORS).forEach((k) => {
+      let v = "";
+      if (!v && cs) v = String(cs.getPropertyValue(COLOR_VARS[k]) || "").trim();
+      out[k] = v || DEFAULT_COLORS[k];
+    });
+    return out;
+  }
   function roundRect(ctx, x, y, w, h2, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -848,6 +885,16 @@ void main() {
     }
     setFont(f) {
       if (f) this.fontFamily = f;
+    }
+    /** E11: رنگ‌ها را از cfg.colors (که Scene پر می‌کند) می‌خواند؛ بدون آن، یک‌بار از DOM/پیش‌فرض. */
+    _colors() {
+      const c = this.cfg && this.cfg.colors;
+      if (c && typeof c === "object") return { ...DEFAULT_COLORS, ...c };
+      if (!this._fallbackColors) {
+        const root = typeof document !== "undefined" ? document.querySelector(".sf3d-root") : null;
+        this._fallbackColors = resolveColors(root);
+      }
+      return this._fallbackColors;
     }
     /** برچسب عنوان + قیمت زیر کاشی */
     label(product, theme) {
@@ -898,6 +945,7 @@ void main() {
     /** نشان‌ها (حراج/جدید/ناموجود) + قلب علاقه‌مندی + تیک انتخاب */
     badge(product, { wished, selected, badges = true, wishlist = true }, theme) {
       const { cfg } = this;
+      const col = this._colors();
       const S = BADGE_PX;
       const c = document.createElement("canvas");
       c.width = S;
@@ -910,9 +958,9 @@ void main() {
       const s = cfg.strings;
       if (badges) {
         const pills = [];
-        if (!product.in_stock) pills.push({ t: s.outOfStock, bg: "#6b7280", fg: "#fff" });
-        if (product.on_sale && product.discount > 0) pills.push({ t: `−${formatPercent(product.discount, cfg.locale)}`, bg: "#e11d48", fg: "#fff" });
-        if (product.is_new) pills.push({ t: s.new, bg: "#16a34a", fg: "#fff" });
+        if (!product.in_stock) pills.push({ t: s.outOfStock, bg: col.oos, fg: "#fff" });
+        if (product.on_sale && product.discount > 0) pills.push({ t: `−${formatPercent(product.discount, cfg.locale)}`, bg: col.sale, fg: "#fff" });
+        if (product.is_new) pills.push({ t: s.new, bg: col.new, fg: "#fff" });
         let y = 14;
         ctx.font = `700 24px ${this.fontFamily}`;
         pills.forEach((p) => {
@@ -935,7 +983,7 @@ void main() {
         ctx.fill();
         heartPath(ctx, cx, cy + 1, 11);
         if (wished) {
-          ctx.fillStyle = "#e11d48";
+          ctx.fillStyle = col.sale;
           ctx.fill();
         } else {
           ctx.strokeStyle = theme.heartStroke;
@@ -946,7 +994,7 @@ void main() {
       if (selected) {
         const cx = S - 44;
         const cy = S - 44;
-        ctx.fillStyle = "#2563eb";
+        ctx.fillStyle = col.selected;
         ctx.beginPath();
         ctx.arc(cx, cy, 28, 0, Math.PI * 2);
         ctx.fill();
@@ -959,7 +1007,7 @@ void main() {
         ctx.lineTo(cx - 3, cy + 10);
         ctx.lineTo(cx + 13, cy - 10);
         ctx.stroke();
-        ctx.strokeStyle = "#2563eb";
+        ctx.strokeStyle = col.selected;
         ctx.lineWidth = 6;
         roundRect(ctx, 4, 4, S - 8, S - 8, 28);
         ctx.stroke();

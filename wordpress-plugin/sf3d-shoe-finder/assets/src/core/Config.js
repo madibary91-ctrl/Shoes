@@ -57,7 +57,14 @@ export const FEATURE_DEFAULTS = {
   cartDrawer: true,
   minimap: true,
   hashSync: true,
+  cardModal: true,
 };
+
+/** پیش‌تنظیم ظاهری پیش‌فرض (فاز ۲: سیستم طراحی) */
+export const DEFAULT_PRESET = 'minimal';
+
+/** اسلاگ مجاز پیش‌تنظیم: حروف کوچک، عدد، خط تیره و زیرخط */
+const PRESET_RE = /^[a-z0-9_-]{1,32}$/;
 
 export const STRINGS = {
   all: 'همه',
@@ -121,6 +128,12 @@ export const STRINGS = {
 
 const num = (v, d) => (Number.isFinite(Number(v)) && v !== '' && v !== null ? Number(v) : d);
 
+/** پیش‌تنظیم نامعتبر یا خالی به مقدار پیش‌فرض برمی‌گردد */
+const normalizePreset = (v) => {
+  const s = typeof v === 'string' ? v.trim().toLowerCase() : '';
+  return PRESET_RE.test(s) ? s : DEFAULT_PRESET;
+};
+
 /**
  * ادغام تنظیمات خام (PHP/المنتور) با پیش‌فرض‌ها
  * @param {Object} raw
@@ -134,6 +147,7 @@ export function normalizeConfig(raw = {}) {
     grid[k] = typeof GRID_DEFAULTS[k] === 'number' ? num(v, GRID_DEFAULTS[k]) : String(v);
   });
 
+  // همه‌ی کلیدهای FEATURE_DEFAULTS (از جمله cardModal) از همین حلقه عبور می‌کنند
   const features = { ...FEATURE_DEFAULTS };
   Object.keys(FEATURE_DEFAULTS).forEach((k) => {
     if (raw.features && k in raw.features) features[k] = !!raw.features[k] && raw.features[k] !== '0';
@@ -156,6 +170,7 @@ export function normalizeConfig(raw = {}) {
     title: raw.title || '',
     height: raw.height || '',
     theme: raw.theme || 'auto',
+    preset: normalizePreset(raw.preset),
     startCollection: raw.startCollection || 'all',
     cardPosition: raw.cardPosition || 'end',
     wishlist: Array.isArray(raw.wishlist) ? raw.wishlist.map(Number) : [],

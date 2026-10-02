@@ -854,7 +854,7 @@ void main() {
     }
     const out = {};
     Object.keys(DEFAULT_COLORS).forEach((k) => {
-      let v = "";
+      let v = overrides && typeof overrides[k] === "string" ? overrides[k].trim() : "";
       if (!v && cs) v = String(cs.getPropertyValue(COLOR_VARS[k]) || "").trim();
       out[k] = v || DEFAULT_COLORS[k];
     });
@@ -892,7 +892,7 @@ void main() {
       if (c && typeof c === "object") return { ...DEFAULT_COLORS, ...c };
       if (!this._fallbackColors) {
         const root = typeof document !== "undefined" ? document.querySelector(".sf3d-root") : null;
-        this._fallbackColors = resolveColors(root);
+        this._fallbackColors = resolveColors(root, null);
       }
       return this._fallbackColors;
     }
@@ -1579,6 +1579,8 @@ void main() {
       this.supported = false;
       this.interactive = false;
       this.lastTap = null;
+      this.colors = null;
+      this._colorOverrides = null;
     }
     mount() {
       this.canvas = document.createElement("canvas");
@@ -1596,6 +1598,7 @@ void main() {
       this.camera = new Camera(this.cfg);
       if (!this.supported) return false;
       this.textures = new TextureStore(this.renderer.gl, {});
+      this._refreshColors();
       this.grid = new Grid({
         cfg: this.cfg,
         app: this.config,
@@ -1694,8 +1697,19 @@ void main() {
       this.camera.resize(w, h2);
       this.events.emit("resize", { w, h: h2 });
     }
+    /** E11: رنگ‌های canvas — اولویت: config.colors ← متغیر CSS (--sf3d-*) ← پیش‌فرض */
+    _refreshColors() {
+      if (!this._colorOverrides) {
+        this._colorOverrides = { ...this.config && this.config.colors || {}, ...this.cfg && this.cfg.colors || {} };
+      }
+      const next = resolveColors(this.container, this._colorOverrides);
+      const target = this.cfg.colors && typeof this.cfg.colors === "object" ? this.cfg.colors : {};
+      this.colors = Object.assign(target, next);
+      this.cfg.colors = this.colors;
+    }
     setDark(v) {
       this.dark = !!v;
+      this._refreshColors();
       this.grid && this.grid.setTheme(this.dark);
     }
     start() {
@@ -1725,7 +1739,7 @@ void main() {
       const r = this.renderer;
       r.begin();
       r.drawBackground({
-        color: this.dark ? "#52525b" : cfg.bgColor,
+        color: this.dark ? this.colors.gridDark : cfg.bgColor,
         opacity: cfg.bgOpacity,
         scale: cfg.bgScale,
         thick: cfg.bgLineThickness,

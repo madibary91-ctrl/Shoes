@@ -136,9 +136,12 @@ final class Renderer implements RendererInterface
             'title'           => (string) ($settings['title'] ?? ''),
             'height'          => (string) ($settings['height'] ?? '100vh'),
             'theme'           => (string) ($settings['theme'] ?? 'auto'),
+            // [F2b] preset از PHP پاس داده می‌شود (قبلاً هرگز به JS نمی‌رسید)
+            'preset'          => Settings::preset($settings['preset'] ?? ''),
             'cardPosition'    => (string) ($settings['card_position'] ?? 'end'),
             'startCollection' => (string) ($settings['start_collection'] ?? 'all'),
             'grid'            => $grid,
+            // [F2b] شامل features.cardModal (از Settings::FEATURES)
             'features'        => (array) ($settings['features'] ?? array()),
             'currency'        => array(
                 'symbol'      => html_entity_decode(get_woocommerce_currency_symbol(), ENT_QUOTES, 'UTF-8'),
@@ -168,38 +171,86 @@ final class Renderer implements RendererInterface
     }
 
     /**
-     * متن‌های رابط (منبع فارسی؛ ترجمه از طریق فایل‌های زبان).
+     * [F14] تمام رشته‌های رابط (منبع فارسی؛ ترجمه از طریق فایل‌های زبان).
+     * کلیدها باید دقیقاً با STRINGS در assets/src/core/Config.js یکی باشند.
+     * دامنه‌ی متن به‌صورت literal نوشته شده تا ابزار استخراج (wp i18n make-pot) همه را ببیند؛
+     * با متغیر $d استخراج رشته‌ها انجام نمی‌شد.
      *
      * @return array<string,string>
      */
     private function strings(): array
     {
-        $d = 'sf3d-shoe-finder';
         return array(
-            'all'            => __('همه', $d),
-            'wishlist'       => __('علاقه‌مندی‌ها', $d),
-            'recent'         => __('اخیراً دیده‌شده', $d),
-            'filters'        => __('فیلترها', $d),
-            'sort'           => __('مرتب‌سازی', $d),
-            'reset'          => __('پاک‌کردن فیلترها', $d),
-            'search'         => __('جستجوی کفش…', $d),
-            'noResults'      => __('نتیجه‌ای پیدا نشد', $d),
-            'addToCart'      => __('افزودن به سبد', $d),
-            'selectOptions'  => __('گزینه‌ها را انتخاب کنید', $d),
-            'outOfStock'     => __('ناموجود', $d),
-            'sale'           => __('حراج', $d),
-            'new'            => __('جدید', $d),
-            'added'          => __('به سبد اضافه شد', $d),
-            'error'          => __('خطایی رخ داد. دوباره تلاش کنید.', $d),
-            'cart'           => __('سبد خرید', $d),
-            'cartEmpty'      => __('سبد خرید شما خالی است', $d),
-            'subtotal'       => __('جمع جزء', $d),
-            'checkout'       => __('تسویه حساب', $d),
-            'continueShopping' => __('ادامه‌ی خرید', $d),
-            'related'        => __('محصولات مشابه', $d),
-            'emptyWishlist'  => __('هنوز چیزی ذخیره نکردی', $d),
-            'lowStock'       => __('فقط {n} عدد باقی مانده!', $d),
-            'viewProduct'    => __('مشاهده محصول', $d),
+            'all'              => __('همه', 'sf3d-shoe-finder'),
+            'wishlist'         => __('علاقه‌مندی‌ها', 'sf3d-shoe-finder'),
+            'recent'           => __('اخیراً دیده‌شده', 'sf3d-shoe-finder'),
+            'filters'          => __('فیلترها', 'sf3d-shoe-finder'),
+            'sort'             => __('مرتب‌سازی', 'sf3d-shoe-finder'),
+            'reset'            => __('پاک‌کردن فیلترها', 'sf3d-shoe-finder'),
+            'search'           => __('جستجوی کفش…', 'sf3d-shoe-finder'),
+            'noResults'        => __('نتیجه‌ای پیدا نشد', 'sf3d-shoe-finder'),
+            'addToCart'        => __('افزودن به سبد', 'sf3d-shoe-finder'),
+            'selectOptions'    => __('گزینه‌ها را انتخاب کنید', 'sf3d-shoe-finder'),
+            'outOfStock'       => __('ناموجود', 'sf3d-shoe-finder'),
+            'sale'             => __('حراج', 'sf3d-shoe-finder'),
+            'new'              => __('جدید', 'sf3d-shoe-finder'),
+            'added'            => __('به سبد اضافه شد', 'sf3d-shoe-finder'),
+            'adding'           => __('در حال افزودن…', 'sf3d-shoe-finder'),
+            'error'            => __('خطایی رخ داد. دوباره تلاش کنید.', 'sf3d-shoe-finder'),
+            'cart'             => __('سبد خرید', 'sf3d-shoe-finder'),
+            'cartEmpty'        => __('سبد خرید شما خالی است', 'sf3d-shoe-finder'),
+            'subtotal'         => __('جمع جزء', 'sf3d-shoe-finder'),
+            'checkout'         => __('تسویه حساب', 'sf3d-shoe-finder'),
+            'continueShopping' => __('ادامه‌ی خرید', 'sf3d-shoe-finder'),
+            'remove'           => __('حذف', 'sf3d-shoe-finder'),
+            'close'            => __('بستن', 'sf3d-shoe-finder'),
+            'related'          => __('محصولات مشابه', 'sf3d-shoe-finder'),
+            'emptyWishlist'    => __('هنوز چیزی ذخیره نکردی', 'sf3d-shoe-finder'),
+            'emptyRecent'      => __('هنوز محصولی ندیده‌ای', 'sf3d-shoe-finder'),
+            // توجه: placeholderهایی مثل {n} و {title} را در ترجمه تغییر ندهید (JS جایگزین می‌کند)
+            'lowStock'         => __('فقط {n} عدد باقی مانده!', 'sf3d-shoe-finder'),
+            'inStock'          => __('موجود در انبار', 'sf3d-shoe-finder'),
+            'share'            => __('اشتراک‌گذاری', 'sf3d-shoe-finder'),
+            'linkCopied'       => __('لینک کپی شد', 'sf3d-shoe-finder'),
+            'quickView'        => __('مشاهده سریع', 'sf3d-shoe-finder'),
+            'compare'          => __('مقایسه', 'sf3d-shoe-finder'),
+            'compareTitle'     => __('مقایسه محصولات', 'sf3d-shoe-finder'),
+            'selected'         => __('{n} محصول انتخاب شد', 'sf3d-shoe-finder'),
+            'bulkAdd'          => __('افزودن به سبد', 'sf3d-shoe-finder'),
+            'clear'            => __('لغو انتخاب', 'sf3d-shoe-finder'),
+            'skip'             => __('پرش به شبکه', 'sf3d-shoe-finder'),
+            'gridLabel'        => __('شبکه محصولات', 'sf3d-shoe-finder'),
+            'viewProduct'      => __('مشاهده محصول', 'sf3d-shoe-finder'),
+            'prev'             => __('قبلی', 'sf3d-shoe-finder'),
+            'next'             => __('بعدی', 'sf3d-shoe-finder'),
+            'darkMode'         => __('حالت تاریک', 'sf3d-shoe-finder'),
+            'lightMode'        => __('حالت روشن', 'sf3d-shoe-finder'),
+            'sortDefault'      => __('پیش‌فرض', 'sf3d-shoe-finder'),
+            'sortNew'          => __('جدیدترین', 'sf3d-shoe-finder'),
+            'sortPriceAsc'     => __('ارزان‌ترین', 'sf3d-shoe-finder'),
+            'sortPriceDesc'    => __('گران‌ترین', 'sf3d-shoe-finder'),
+            'sortPopular'      => __('محبوب‌ترین', 'sf3d-shoe-finder'),
+            'size'             => __('سایز', 'sf3d-shoe-finder'),
+            'color'            => __('رنگ', 'sf3d-shoe-finder'),
+            'choose'           => __('انتخاب…', 'sf3d-shoe-finder'),
+            'spin360'          => __('برای چرخاندن بکشید', 'sf3d-shoe-finder'),
+            'addedAnnounce'    => __('{title} به سبد اضافه شد', 'sf3d-shoe-finder'),
+            'wishlistAdded'    => __('{title} به علاقه‌مندی‌ها اضافه شد', 'sf3d-shoe-finder'),
+            'wishlistRemoved'  => __('{title} از علاقه‌مندی‌ها حذف شد', 'sf3d-shoe-finder'),
+            'focused'          => __('{title} انتخاب شد', 'sf3d-shoe-finder'),
+            'products'         => __('محصول', 'sf3d-shoe-finder'),
+            // ── کلید جدید F14 ──
+            'gallery'          => __('گالری تصاویر', 'sf3d-shoe-finder'),
+            // ── کلیدهای مورد نیاز fixهای F5, F7, F9, F10, F17 ──
+            'networkError'     => __('اتصال برقرار نشد. اینترنت خود را بررسی کنید و دوباره تلاش کنید.', 'sf3d-shoe-finder'),
+            'resultsCount'     => __('{n} محصول یافت شد', 'sf3d-shoe-finder'),
+            'cartCount'        => __('سبد خرید، {n} کالا', 'sf3d-shoe-finder'),
+            'compareOn'        => __('{title} به مقایسه اضافه شد', 'sf3d-shoe-finder'),
+            'compareOff'       => __('{title} از مقایسه حذف شد', 'sf3d-shoe-finder'),
+            'selectOn'         => __('{title} برای افزودن گروهی انتخاب شد', 'sf3d-shoe-finder'),
+            'selectOff'        => __('{title} از انتخاب گروهی خارج شد', 'sf3d-shoe-finder'),
+            'webglLost'        => __('نمایش سه‌بعدی قطع شد؛ در حال بازیابی…', 'sf3d-shoe-finder'),
+            'webglRestored'    => __('نمایش سه‌بعدی دوباره برقرار شد', 'sf3d-shoe-finder'),
         );
     }
 }

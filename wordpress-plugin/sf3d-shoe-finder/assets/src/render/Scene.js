@@ -4,6 +4,7 @@ import { Camera } from './Camera.js';
 import { TextureStore } from './TextureStore.js';
 import { Grid } from '../grid/Grid.js';
 import { isReducedMotion } from '../utils/damp.js';
+import { resolveColors } from '../grid/Badges.js';
 
 export class Scene {
   /**
@@ -28,6 +29,8 @@ export class Scene {
     this.supported = false;
     this.interactive = false; // E04: حالت تعامل کامل (touch-action: none)
     this.lastTap = null;
+    this.colors = null; // E11
+    this._colorOverrides = null;
   }
 
   mount() {
@@ -48,6 +51,7 @@ export class Scene {
     if (!this.supported) return false;
 
     this.textures = new TextureStore(this.renderer.gl, {});
+    this._refreshColors(); // E11: پیش از Grid تا LabelPainter رنگ‌ها را بخواند
     this.grid = new Grid({
       cfg: this.cfg,
       app: this.config,
@@ -153,8 +157,20 @@ export class Scene {
     this.events.emit('resize', { w, h });
   }
 
+  /** E11: رنگ‌های canvas — اولویت: config.colors ← متغیر CSS (--sf3d-*) ← پیش‌فرض */
+  _refreshColors() {
+    if (!this._colorOverrides) {
+      this._colorOverrides = { ...((this.config && this.config.colors) || {}), ...((this.cfg && this.cfg.colors) || {}) };
+    }
+    const next = resolveColors(this.container, this._colorOverrides);
+    const target = this.cfg.colors && typeof this.cfg.colors === 'object' ? this.cfg.colors : {};
+    this.colors = Object.assign(target, next); // همان شیء را نگه می‌داریم تا LabelPainter (cfg.colors) به‌روز بماند
+    this.cfg.colors = this.colors;
+  }
+
   setDark(v) {
     this.dark = !!v;
+    this._refreshColors(); // E11: تغییر تم → رنگ‌ها دوباره خوانده شود
     this.grid && this.grid.setTheme(this.dark);
   }
 
@@ -187,7 +203,7 @@ export class Scene {
     const r = this.renderer;
     r.begin();
     r.drawBackground({
-      color: this.dark ? '#52525b' : cfg.bgColor,
+      color: this.dark ? this.colors.gridDark : cfg.bgColor,
       opacity: cfg.bgOpacity,
       scale: cfg.bgScale,
       thick: cfg.bgLineThickness,

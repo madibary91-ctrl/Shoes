@@ -85,6 +85,46 @@ final class AjaxController
         wp_send_json_success($response);
     }
 
+    /**
+     * [F4] پاک‌سازی ویژگی‌های Variation دقیقاً مثل WC_Form_Handler::add_to_cart_handler_variable.
+     *
+     * مشکل قبلی: sanitize_key کاراکتر % را حذف می‌کرد و wc_clean هم دنباله‌های %xx را پاک می‌کرد؛
+     * پس اسلاگ‌های فارسی (مثل %d9%82%d8%b1%d9%85%d8%b2) خراب می‌شدند و add_to_cart با
+     * «لطفاً گزینه‌ها را انتخاب کنید» شکست می‌خورد.
+     *
+     * روش ووکامرس: کلید = 'attribute_' . sanitize_title(نام ویژگی)؛
+     *  - ویژگی taxonomy (pa_*): مقدار با sanitize_title (حفظ %xx)
+     *  - ویژگی سفارشی: مقدار با wc_clean + html_entity_decode
+     * ما فقط کلیدهایی را می‌پذیریم که واقعاً ویژگی variation همین محصول باشند.
+     *
+     * @param \WC_Product         $product محصول.
+     * @param array<string,mixed> $raw     ورودی خام (بعد از wp_unslash).
+     * @return array<string,string>
+     */
+    private function sanitizeVariation(\WC_Product $product, array $raw): array
+    {
+        $out = array();
+        if (!$product->is_type('variable')) {
+            return $out;
+        }
+        foreach ($product->get_attributes() as $attribute) {
+            if (!$attribute instanceof \WC_Product_Attribute || !$attribute->get_variation()) {
+                continue;
+            }
+            $key = 'attribute_' . sanitize_title($attribute->get_name());
+            if (!isset($raw[$key]) || !is_scalar($raw[$key])) {
+                continue;
+            }
+            $value = (string) $raw[$key];
+            if ($attribute->is_taxonomy()) {
+                $out[$key] = sanitize_title($value);
+            } else {
+                $out[$key] = html_entity_decode(wc_clean($value), ENT_QUOTES, get_bloginfo('charset'));
+            }
+        }
+        return $out;
+    }
+
     public function nonce(): void
     {
         nocache_headers();
@@ -100,16 +140,16 @@ final class AjaxController
         $variation_id = isset($_POST['variation_id']) ? absint(wp_unslash($_POST['variation_id'])) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing
         $quantity     = isset($_POST['quantity']) ? max(1, (int) wc_stock_amount(wp_unslash($_POST['quantity']))) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
-        $variation = array();
-        if (isset($_POST['variation']) && is_array($_POST['variation'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-            foreach (wp_unslash($_POST['variation']) as $key => $value) { // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-                $variation[sanitize_key((string) $key)] = wc_clean((string) $value);
-            }
-        }
-
         $product = $product_id ? wc_get_product($product_id) : false;
         if (!$product || !$product->is_purchasable()) {
             wp_send_json_error(array('code' => 'not_purchasable', 'message' => __('این محصول قابل خرید نیست.', 'sf3d-shoe-finder')), 400);
+        }
+
+        // [F4] ورودی variation بعد از دریافت محصول پاک‌سازی می‌شود (نیاز به لیست ویژگی‌های محصول)
+        $variation = array();
+        if (isset($_POST['variation']) && is_array($_POST['variation'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+            $variation = $this->sanitizeVariation($product, (array) wp_unslash($_POST['variation']));
         }
 
         EventRegistry::fire(EventRegistry::A_BEFORE_ADD_TO_CART, $product_id, $variation_id, $quantity, $variation);
@@ -152,6 +192,7 @@ final class AjaxController
     public function related(): void
     {
         $id = isset($_GET['id']) ? absint(wp_unslash($_GET['id'])) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        // [F3] فیلتر محصول رمزدار/مخفی داخل Repository انجام می‌شود (related() و find() و search())
         $this->respond(array('products' => $id ? $this->products->related($id, 4) : array()), 'related');
     }
 
@@ -166,6 +207,7 @@ final class AjaxController
         $id      = isset($_GET['id']) ? absint(wp_unslash($_GET['id'])) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $product = $id ? $this->products->find($id) : null;
         if (!$product) {
+            // [F3] برای محصول رمزدار/مخفی هم همین 404 برمی‌گردد (وجود محصول لو نمی‌رود)
             wp_send_json_error(array('code' => 'not_found', 'message' => __('محصول پیدا نشد.', 'sf3d-shoe-finder')), 404);
         }
         $this->respond(array('product' => $product), 'product');

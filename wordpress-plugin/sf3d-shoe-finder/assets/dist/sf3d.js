@@ -2829,7 +2829,7 @@ void main() {
       this.refresh();
       this.el.classList.add("is-open");
       this.release = app.focusManager.trap(this.el, { onEscape: () => app.closeProduct(), initial: closeBtn });
-      if (c.cardModal !== false) {
+      if (c.features.cardModal !== false) {
         this.el.setAttribute("aria-modal", "true");
         this.releaseInert = inertOthers(app.stage, this.el);
       } else {
@@ -2909,8 +2909,6 @@ void main() {
         this.refresh();
       }
     }
-    // ⚠️ بخش انتهایی فایل اصلی (destroy) در خروجی ابزار من قطع شده بود و آن را ندیدم.
-    // این نسخه بازسازی شده است؛ قبل از جایگزینی با destroy() فعلی خودتان مقایسه کنید.
     destroy() {
       this.unsub && this.unsub();
       this.clearParts();

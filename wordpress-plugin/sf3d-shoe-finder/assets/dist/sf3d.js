@@ -1529,12 +1529,15 @@ void main() {
       this.moved = false;
       this.visible = true;
       this.supported = false;
+      this.interactive = false;
+      this.lastTap = null;
     }
     mount() {
       this.canvas = document.createElement("canvas");
       this.canvas.className = "sf3d-canvas";
       this.canvas.setAttribute("aria-hidden", "true");
       this.container.appendChild(this.canvas);
+      this._buildTouchToggle();
       this.renderer = new Renderer(this.canvas, {
         onQuality: (q) => {
           this.grid && (this.grid.quality = q);
@@ -1561,6 +1564,7 @@ void main() {
       this._bind();
       this.io = new IntersectionObserver((entries) => {
         this.visible = entries[0].isIntersecting;
+        if (!this.visible) this.setInteractive(false);
         this.visible ? this.start() : this.stop();
       });
       this.io.observe(this.container);
@@ -1568,6 +1572,71 @@ void main() {
         this.store.subscribe("activeProduct", (id) => this.onActive(id))
       ];
       return true;
+    }
+    /** E04: جابه‌جایی حالت تعامل. false = اسکرول صفحه (pan-y)، true = کنترل کامل نقشه (none) */
+    setInteractive(on) {
+      on = !!on;
+      if (this.interactive === on) return;
+      this.interactive = on;
+      this.pointers.clear();
+      this.pinch = 0;
+      clearTimeout(this.longTimer);
+      this.container.classList.toggle("is-interactive", on);
+      const L = this._tl;
+      if (this._touchBtn) {
+        this._touchBtn.setAttribute("aria-pressed", on ? "true" : "false");
+        this._touchBtn.textContent = on ? L.off : L.on;
+      }
+      if (this._touchHint) {
+        this._touchHint.textContent = on ? L.hintOn : L.hintOff;
+        clearTimeout(this._hintTimer);
+        this._hintTimer = setTimeout(() => {
+          this._touchHint.textContent = "";
+        }, 3500);
+      }
+      this.events.emit("touchmode", on);
+    }
+    /** E04: دکمه‌ی جایگزین ژست دوبار ضربه (WCAG 2.5.1) + ناحیه‌ی اعلان وضعیت */
+    _buildTouchToggle() {
+      const t = this.config && this.config.i18n || {};
+      this._tl = {
+        on: t.touchOn || "فعال‌سازی تعامل با نقشه",
+        off: t.touchOff || "خروج از تعامل (اسکرول صفحه)",
+        hintOn: t.touchHintOn || "حالت تعامل فعال شد. برای اسکرول صفحه دوبار روی فضای خالی ضربه بزنید.",
+        hintOff: t.touchHintOff || "اسکرول صفحه فعال شد."
+      };
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sf3d-touchtoggle";
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = this._tl.on;
+      btn.addEventListener("click", () => this.setInteractive(!this.interactive));
+      const hint = document.createElement("div");
+      hint.className = "sf3d-touchhint";
+      hint.setAttribute("role", "status");
+      hint.setAttribute("aria-live", "polite");
+      this.container.append(btn, hint);
+      this._touchBtn = btn;
+      this._touchHint = hint;
+      this.container.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && this.interactive) this.setInteractive(false);
+      });
+    }
+    /** E04: دوبار ضربه روی فضای خالی (نه روی کاشی) → true یعنی حالت عوض شد و کلیک باید نادیده گرفته شود */
+    _isDoubleTap(p) {
+      const now = performance.now();
+      const prev = this.lastTap;
+      if (this.grid.pickAt(p.x, p.y)) {
+        this.lastTap = null;
+        return false;
+      }
+      if (prev && now - prev.t < 320 && Math.hypot(p.x - prev.x, p.y - prev.y) < 36) {
+        this.lastTap = null;
+        this.setInteractive(!this.interactive);
+        return true;
+      }
+      this.lastTap = { t: now, x: p.x, y: p.y };
+      return false;
     }
     resize() {
       const r = this.container.getBoundingClientRect();
@@ -1663,6 +1732,10 @@ void main() {
       const cfg = this.cfg;
       this._down = (e) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
+        if (e.pointerType === "touch" && !this.interactive) {
+          this.pointers.clear();
+          this.pinch = 0;
+        }
         try {
           c.setPointerCapture(e.pointerId);
         } catch (err) {
@@ -1723,7 +1796,9 @@ void main() {
         this.pointers.delete(e.pointerId);
         clearTimeout(this.longTimer);
         if (wasSingle) {
-          if (!this.moved && !this.longFired && e.type === "pointerup") this._click(p, e);
+          if (!this.moved && !this.longFired && e.type === "pointerup") {
+            if (!(e.pointerType === "touch" && this._isDoubleTap(p))) this._click(p, e);
+          }
           if (this.moved) this.camera.release();
           this.grid.dragging = false;
           this.container.classList.remove("is-dragging");

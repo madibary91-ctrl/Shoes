@@ -268,3 +268,19 @@
   .sf3d-root .sf3d-chip, .sf3d-root .sf3d-btn, .sf3d-root .sf3d-iconbtn { border-width: 2px; }
   .sf3d-root :focus-visible { outline-width: 4px; }
 }
+
+/* ==========================================================================
+   E04: قفل اسکرول موبایل
+   پیش‌فرض canvas فقط پن افقی را خودش می‌گیرد (pan-y)؛ کشیدن عمودی = اسکرول صفحه.
+   حالت تعامل کامل با دوبار ضربه روی فضای خالی یا دکمه‌ی جایگزین فعال می‌شود.
+   ========================================================================== */
+.sf3d-root.is-interactive .sf3d-canvas,
+.is-interactive > .sf3d-canvas { touch-action: none; overscroll-behavior: contain; }
+
+.sf3d-touchtoggle { display: none; position: absolute; z-index: 20; top: 74px; inset-inline-end: 16px; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--sf3d-border); background: var(--sf3d-surface); color: var(--sf3d-fg); font-weight: 600; font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); transition: background 0.2s, color 0.2s; }
+.sf3d-touchtoggle[aria-pressed='true'] { background: var(--sf3d-accent); color: var(--sf3d-accent-fg); border-color: transparent; }
+@media (pointer: coarse), (hover: none) { .sf3d-touchtoggle { display: inline-flex; } }
+
+.sf3d-touchhint { position: absolute; z-index: 21; top: 134px; inset-inline: 16px; margin-inline: auto; width: max-content; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 14px; background: var(--sf3d-island); color: var(--sf3d-island-fg); font-size: 13px; line-height: 1.7; text-align: center; pointer-events: none; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25); }
+.sf3d-touchhint:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .sf3d-touchtoggle { transition: none; } }

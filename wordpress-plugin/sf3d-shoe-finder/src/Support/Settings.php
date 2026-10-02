@@ -9,6 +9,9 @@ namespace SF3D\Plugin\Support;
  */
 final class Settings
 {
+    /** پیش‌تنظیم ظاهری پیش‌فرض (باید با DEFAULT_PRESET در Config.js یکی باشد) */
+    public const DEFAULT_PRESET = 'minimal';
+
     /** کلیدهای قابلیت‌ها (نام snake_case → نام camelCase در JS) */
     private const FEATURES = array(
         'wishlist'      => 'wishlist',
@@ -25,6 +28,8 @@ final class Settings
         'cart_drawer'   => 'cartDrawer',
         'minimap'       => 'minimap',
         'hash_sync'     => 'hashSync',
+        // [F2b] قبلاً نبود؛ بدون آن features.cardModal از PHP هرگز نمی‌رسید
+        'card_modal'    => 'cardModal',
     );
 
     /** نگاشت تنظیمات grid (ورودی → کلید JS) */
@@ -42,6 +47,26 @@ final class Settings
         'fog_far'      => 'fogFar',
         'bg_opacity'   => 'bgOpacity',
         'bg_line_size' => 'bgLineThickness',
+    );
+
+    /**
+     * [F11] بازه‌ی مجاز (کلید JS → [min, max, فقط‌صحیح؟]).
+     * باید با GRID_LIMITS در assets/src/core/Config.js یکی نگه داشته شود.
+     */
+    private const GRID_LIMITS = array(
+        'gridCols'          => array(1, 24, true),
+        'itemSize'          => array(0.5, 10, false),
+        'gap'               => array(0, 5, false),
+        'zoomIn'            => array(2, 80, false),
+        'zoomOut'           => array(5, 160, false),
+        'dragSpeed'         => array(0.1, 10, false),
+        'focusScale'        => array(1, 4, false),
+        'dimOpacity'        => array(0, 1, false),
+        'curvatureStrength' => array(0, 1, false),
+        'fogNear'           => array(0, 500, false),
+        'fogFar'            => array(1, 1000, false),
+        'bgOpacity'         => array(0, 1, false),
+        'bgLineThickness'   => array(0, 1, false),
     );
 
     /**
@@ -67,11 +92,20 @@ final class Settings
             if (isset($raw[$in]) && $raw[$in] !== '') {
                 $value = self::scalar($raw[$in]);
                 if (is_numeric($value)) {
-                    $grid[$out] = (float) $value;
+                    // [F11] clamp سمت سرور؛ gridCols=0 یا مقدار منفی دیگر به JS نمی‌رسد
+                    $grid[$out] = self::clampGrid($out, (float) $value);
                 }
             }
         }
-        $bg = isset($raw['bg_color']) ? sanitize_hex_color((string) $raw['bg_color']) : null;
+        // [F11] روابط بین مقادیر (همان منطق JS)
+        if (isset($grid['zoomIn'], $grid['zoomOut']) && $grid['zoomOut'] <= $grid['zoomIn']) {
+            $grid['zoomOut'] = $grid['zoomIn'] + 1;
+        }
+        if (isset($grid['fogNear'], $grid['fogFar']) && $grid['fogFar'] <= $grid['fogNear']) {
+            $grid['fogFar'] = $grid['fogNear'] + 1;
+        }
+
+        $bg = isset($raw['bg_color']) ? sanitize_hex_color((string) self::scalar($raw['bg_color'])) : null;
         if ($bg) {
             $grid['bgColor'] = $bg;
         }
@@ -91,10 +125,39 @@ final class Settings
             'title'            => sanitize_text_field((string) ($raw['title'] ?? '')),
             'theme'            => $theme,
             'card_position'    => $card,
+            // [F2b] preset: فقط اسلاگ مجاز؛ نامعتبر → پیش‌فرض (همان regex سمت JS)
+            'preset'           => self::preset($raw['preset'] ?? ''),
             'start_collection' => sanitize_title((string) ($raw['start_collection'] ?? 'all')) ?: 'all',
             'grid'             => $grid,
             'features'         => $features,
         );
+    }
+
+    /**
+     * [F2b] اسلاگ پیش‌تنظیم: حروف کوچک، عدد، خط تیره و زیرخط (حداکثر ۳۲ کاراکتر).
+     *
+     * @param mixed $value مقدار خام.
+     */
+    public static function preset($value): string
+    {
+        $s = strtolower(trim((string) self::scalar($value)));
+        return preg_match('/^[a-z0-9_-]{1,32}$/', $s) === 1 ? $s : self::DEFAULT_PRESET;
+    }
+
+    /**
+     * [F11] مقدار را در بازه‌ی GRID_LIMITS نگه می‌دارد.
+     */
+    private static function clampGrid(string $key, float $value): float
+    {
+        if (!is_finite($value)) {
+            $value = 0.0;
+        }
+        if (!isset(self::GRID_LIMITS[$key])) {
+            return $value;
+        }
+        list($min, $max, $int) = self::GRID_LIMITS[$key];
+        $value = max((float) $min, min((float) $max, $value));
+        return $int ? (float) round($value) : $value;
     }
 
     /**

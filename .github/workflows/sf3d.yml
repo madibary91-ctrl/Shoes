@@ -1,0 +1,130 @@
+name: SF3D CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'wordpress-plugin/sf3d-shoe-finder/**'
+      - '.github/workflows/sf3d.yml'
+      - '!wordpress-plugin/sf3d-shoe-finder/assets/dist/**'
+  pull_request:
+    paths:
+      - 'wordpress-plugin/sf3d-shoe-finder/**'
+      - '.github/workflows/sf3d.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sf3d-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLUGIN_DIR: wordpress-plugin/sf3d-shoe-finder
+  PLUGIN_SLUG: sf3d-shoe-finder
+
+jobs:
+  build:
+    name: Test, build and commit dist
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.PLUGIN_DIR }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.PLUGIN_DIR }}/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf3d-dist
+          path: ${{ env.PLUGIN_DIR }}/assets/dist
+          if-no-files-found: error
+
+      - name: Commit dist (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A assets/dist
+          if git diff --cached --quiet; then
+            echo "dist is up to date. Nothing to commit."
+          else
+            git commit -m "chore: rebuild dist after phase 1 fixes [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+  release:
+    name: Package ZIP and publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.PLUGIN_DIR }}/package-lock.json
+
+      - name: Install and build
+        working-directory: ${{ env.PLUGIN_DIR }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create ZIP
+        run: |
+          cd wordpress-plugin
+          zip -r "../${PLUGIN_SLUG}-${GITHUB_REF_NAME}.zip" "${PLUGIN_SLUG}" \
+            -x "${PLUGIN_SLUG}/node_modules/*" \
+               "${PLUGIN_SLUG}/tests/*" \
+               "${PLUGIN_SLUG}/vendor/*" \
+               "${PLUGIN_SLUG}/.git*" \
+               "${PLUGIN_SLUG}/package*.json" \
+               "${PLUGIN_SLUG}/composer.json" \
+               "${PLUGIN_SLUG}/phpstan.neon" \
+               "${PLUGIN_SLUG}/phpunit.xml.dist" \
+               "${PLUGIN_SLUG}/playwright.config.js" \
+               "${PLUGIN_SLUG}/vite.config.js" \
+               "${PLUGIN_SLUG}/vitest.config.js" \
+               "${PLUGIN_SLUG}/PHASE1-NOTES.md"
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_SLUG }}-zip
+          path: ${{ env.PLUGIN_SLUG }}-${{ github.ref_name }}.zip
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "${PLUGIN_SLUG}-${GITHUB_REF_NAME}.zip" \
+            --title "SF3D Shoe Finder ${GITHUB_REF_NAME}" \
+            --generate-notes

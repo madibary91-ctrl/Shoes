@@ -156,8 +156,10 @@ export class Card {
     // ۲) بعد inert: اگر عنصر فوکوس‌شده داخل بخش inert باشد مرورگر فوکوس را رها می‌کند
     // aria-modal فقط وقتی گذاشته می‌شود که بقیه‌ی صحنه واقعاً غیرفعال شده باشد
     // (کانواس برای درگ/کلیک روی کفش‌ها و live regionها عمداً فعال می‌مانند)
-    // برای پنل غیرمودال: config.cardModal = false
-    if (c.cardModal !== false) {
+    // [F2a] کلید cardModal زیر config.features است (Config.js همان‌جا نگهش می‌دارد).
+    // قبلاً از سطح بالای config خوانده می‌شد که همیشه undefined بود، پس پنل غیرمودال هرگز کار نمی‌کرد.
+    // برای پنل غیرمودال: features.cardModal = false (در PHP: card_modal="0")
+    if (c.features.cardModal !== false) {
       this.el.setAttribute('aria-modal', 'true');
       this.releaseInert = inertOthers(app.stage, this.el);
     } else {
@@ -246,8 +248,6 @@ export class Card {
     }
   }
 
-  // ⚠️ بخش انتهایی فایل اصلی (destroy) در خروجی ابزار من قطع شده بود و آن را ندیدم.
-  // این نسخه بازسازی شده است؛ قبل از جایگزینی با destroy() فعلی خودتان مقایسه کنید.
   destroy() {
     this.unsub && this.unsub();
     this.clearParts();

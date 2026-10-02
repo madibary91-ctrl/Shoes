@@ -3518,43 +3518,114 @@ void main() {
       this.skip.remove();
     }
   }
-  function parseHash(hash = location.hash) {
+  const HASH_LIMITS = Object.freeze({
+    MAX_HASH_LENGTH: 2e3,
+    MAX_FILTER_KEYS: 12,
+    MAX_VALUES_PER_KEY: 20,
+    MAX_FILTER_PAIRS: 50,
+    MAX_KEY_LENGTH: 32,
+    MAX_VALUE_LENGTH: 64
+  });
+  const KEY_RE = /^[\p{L}\p{N}_-]{1,32}$/u;
+  const VALUE_RE = /^[\p{L}\p{N}_.-]{1,64}$/u;
+  const SLUG_RE = /^[\p{L}\p{N}_-]{1,64}$/u;
+  const SORT_RE = /^[a-z0-9_-]{1,32}$/i;
+  const PRODUCT_RE = /^product-(\d{1,10})$/;
+  const BLOCKED_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
+  const ALLOWED_TOP_KEYS = /* @__PURE__ */ new Set(["filter", "sort", "collection"]);
+  const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const isSafeKey = (k) => typeof k === "string" && KEY_RE.test(k) && !BLOCKED_KEYS.has(k.toLowerCase());
+  const isSafeValue = (v) => typeof v === "string" && VALUE_RE.test(v);
+  function safeDecode(s) {
+    try {
+      return decodeURIComponent(s);
+    } catch (e) {
+      return null;
+    }
+  }
+  function currentHash() {
+    return typeof location !== "undefined" ? location.hash : "";
+  }
+  function parseFilter(val, allowed, target) {
+    let pairs = 0;
+    for (const pair of val.split(",")) {
+      if (pairs >= HASH_LIMITS.MAX_FILTER_PAIRS) break;
+      const idx = pair.indexOf(":");
+      if (idx < 1) continue;
+      const k = pair.slice(0, idx);
+      const v = pair.slice(idx + 1);
+      if (!isSafeKey(k) || !isSafeValue(v)) continue;
+      if (allowed && !allowed.has(k)) continue;
+      if (!hasOwn(target, k)) {
+        if (Object.keys(target).length >= HASH_LIMITS.MAX_FILTER_KEYS) continue;
+        target[k] = [];
+      }
+      const list = target[k];
+      if (list.length >= HASH_LIMITS.MAX_VALUES_PER_KEY || list.includes(v)) continue;
+      list.push(v);
+      pairs++;
+    }
+  }
+  function parseHash(hash = currentHash(), options = {}) {
     const out = { product: null, filter: {}, sort: "", collection: "" };
     const raw = String(hash || "").replace(/^#/, "");
-    if (!raw) return out;
-    raw.split("&").forEach((part) => {
-      const m = /^product-(\d+)$/.exec(part);
+    if (!raw || raw.length > HASH_LIMITS.MAX_HASH_LENGTH) return out;
+    const allowed = options && options.filterKeys ? new Set(options.filterKeys) : null;
+    const seen = /* @__PURE__ */ new Set();
+    for (const part of raw.split("&")) {
+      const m = PRODUCT_RE.exec(part);
       if (m) {
-        out.product = Number(m[1]);
-        return;
+        const id = Number(m[1]);
+        if (out.product === null && Number.isSafeInteger(id) && id > 0) out.product = id;
+        continue;
       }
       const eq = part.indexOf("=");
-      if (eq < 0) return;
+      if (eq < 1) continue;
       const key = part.slice(0, eq);
-      const val = decodeURIComponent(part.slice(eq + 1));
-      if (key === "filter") {
-        val.split(",").forEach((pair) => {
-          const [k, v] = pair.split(":");
-          if (k && v) (out.filter[k] = out.filter[k] || []).push(v);
-        });
-      } else if (key === "sort") out.sort = val;
-      else if (key === "collection") out.collection = val;
-    });
+      if (!ALLOWED_TOP_KEYS.has(key) || seen.has(key)) continue;
+      const val = safeDecode(part.slice(eq + 1));
+      if (val === null) continue;
+      seen.add(key);
+      if (key === "filter") parseFilter(val, allowed, out.filter);
+      else if (key === "sort") out.sort = SORT_RE.test(val) ? val : "";
+      else if (key === "collection") out.collection = SLUG_RE.test(val) ? val : "";
+    }
     return out;
   }
-  function buildHash({ product, filter, sort, collection }) {
+  function buildHash({ product, filter, sort, collection } = {}) {
     const parts = [];
-    if (product) parts.push(`product-${product}`);
-    const f = Object.entries(filter || {}).flatMap(([k, vals]) => (vals || []).map((v) => `${k}:${v}`)).join(",");
+    const id = Number(product);
+    if (Number.isSafeInteger(id) && id > 0) parts.push(`product-${id}`);
+    const pairs = [];
+    const keys = /* @__PURE__ */ new Set();
+    Object.keys(filter || {}).forEach((k) => {
+      if (!isSafeKey(k)) return;
+      const vals = Array.isArray(filter[k]) ? filter[k] : [];
+      const clean = [];
+      vals.forEach((v) => {
+        v = String(v);
+        if (isSafeValue(v) && !clean.includes(v) && clean.length < HASH_LIMITS.MAX_VALUES_PER_KEY) clean.push(v);
+      });
+      if (!clean.length || keys.size >= HASH_LIMITS.MAX_FILTER_KEYS) return;
+      keys.add(k);
+      clean.forEach((v) => pairs.push(`${k}:${v}`));
+    });
+    const f = pairs.slice(0, HASH_LIMITS.MAX_FILTER_PAIRS).join(",");
     if (f) parts.push(`filter=${encodeURIComponent(f)}`);
-    if (sort && sort !== "default") parts.push(`sort=${encodeURIComponent(sort)}`);
-    if (collection && collection !== "all") parts.push(`collection=${encodeURIComponent(collection)}`);
+    if (sort && sort !== "default" && SORT_RE.test(sort)) parts.push(`sort=${encodeURIComponent(sort)}`);
+    if (collection && collection !== "all" && SLUG_RE.test(collection)) parts.push(`collection=${encodeURIComponent(collection)}`);
     return parts.length ? `#${parts.join("&")}` : "";
   }
   function writeHash(state) {
-    const next = buildHash(state);
-    const url = location.pathname + location.search + next;
-    if (location.hash !== next) history.replaceState(null, "", url);
+    if (typeof location === "undefined" || typeof history === "undefined" || typeof history.replaceState !== "function") return false;
+    const next = buildHash(state || {});
+    if (location.hash === next) return false;
+    try {
+      history.replaceState(history.state, "", location.pathname + location.search + next);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
   let uidCounter = 0;
   const RECENT_KEY = "sf3d:recent";

@@ -15,6 +15,13 @@
   --sf3d-ok: #15803d;
   --sf3d-radius: 18px;
   --sf3d-focus: #2563eb;
+  /* E11: توکن‌های رنگ (canvas هم از همین‌ها می‌خواند) */
+  --sf3d-sale: #e11d48;
+  --sf3d-new: #16a34a;
+  --sf3d-dot: #38bdf8;
+  --sf3d-oos: #6b7280;
+  --sf3d-grid-dark: #52525b;
+  --sf3d-selected: #2563eb;
   position: relative;
   width: 100%;
   height: var(--sf3d-height, 100vh);
@@ -103,8 +110,8 @@
 .sf3d-tab:hover { opacity: 1; }
 .sf3d-tab.is-active { background: rgba(255, 255, 255, 0.18); opacity: 1; }
 .sf3d-tab--filter { border: 1px solid rgba(255, 255, 255, 0.25); margin-inline-start: 4px; }
-.sf3d-tab__count { font-size: 11px; background: #e11d48; padding: 0 6px; border-radius: 9px; min-width: 18px; text-align: center; }
-.sf3d-dot { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; position: absolute; top: 10px; inset-inline-end: 12px; }
+.sf3d-tab__count { font-size: 11px; background: var(--sf3d-sale); padding: 0 6px; border-radius: 9px; min-width: 18px; text-align: center; }
+.sf3d-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sf3d-dot); position: absolute; top: 10px; inset-inline-end: 12px; }
 .sf3d-island__panel { padding: 14px 16px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); max-height: 40vh; overflow-y: auto; }
 .sf3d-filters { display: flex; flex-direction: column; gap: 10px; }
 .sf3d-filters__row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
@@ -128,9 +135,9 @@
 .sf3d-card__body { padding: 6px 20px 8px; display: flex; flex-direction: column; gap: 10px; }
 .sf3d-card__badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .sf3d-pill { display: inline-block; padding: 2px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; }
-.sf3d-pill--sale { background: #e11d48; }
-.sf3d-pill--new { background: #16a34a; }
-.sf3d-pill--muted { background: #6b7280; }
+.sf3d-pill--sale { background: var(--sf3d-sale); }
+.sf3d-pill--new { background: var(--sf3d-new); }
+.sf3d-pill--muted { background: var(--sf3d-oos); }
 .sf3d-card__title { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 800; }
 .sf3d-card__price { font-size: 18px; font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
 .sf3d-price__old { color: var(--sf3d-muted); font-weight: 400; font-size: 14px; }
@@ -186,7 +193,7 @@
 .sf3d-related__name { font-size: 10px; line-height: 1.3; max-height: 2.6em; overflow: hidden; text-align: center; }
 
 /* قلب */
-.sf3d-heart .sf3d-icon:nth-child(2) { display: none; color: #e11d48; }
+.sf3d-heart .sf3d-icon:nth-child(2) { display: none; color: var(--sf3d-sale); }
 .sf3d-heart.is-on .sf3d-icon:nth-child(1) { display: none; }
 .sf3d-heart.is-on .sf3d-icon:nth-child(2) { display: inline-flex; }
 .sf3d-heart.pop .sf3d-icon { animation: sf3d-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1); }
